@@ -5,7 +5,18 @@ import Prelude hiding (lookup)
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
 
-type Answer = Value
+type M a = a 
+
+unitM :: a -> M a
+unitM a = a 
+
+bindM :: M a -> (a -> M b) -> M b 
+bindM m k = k m 
+
+showM :: M Value -> String 
+showM = showval 
+
+type Answer = M Value 
 
 type K a = (a -> Answer) -> Answer
 
@@ -16,10 +27,13 @@ bindK :: K a -> (a -> K b) -> K b
 bindK m f c = m (`f` c)
 
 showK :: K Value -> String
-showK m = showval (m id)
+showK m = showM (m unitM)
 
 callccK :: ((a -> K b) -> K a) -> K a
 callccK h c = let k a p = c a in h k c
+
+promoteK :: M a -> K a 
+promoteK m c = m `bindM` c 
 
 type Name = String
 
