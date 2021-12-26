@@ -15,9 +15,11 @@ unitK a c = c a
 bindK :: K a -> (a -> K b) -> K b
 bindK m f c = m (`f` c)
 
-
 showK :: K Value -> String
 showK m = showval (m id)
+
+callccK :: ((a -> K b) -> K a) -> K a
+callccK h c = let k a p = c a in h k c
 
 type Name = String
 
@@ -27,6 +29,7 @@ data Term
   | Add Term Term
   | Lam Name Term
   | App Term Term
+  | Callcc Name Term
 
 data Value
   = Wrong
@@ -56,6 +59,7 @@ interp (App t u) e =
                 interp u e
                   `bindK` apply f
             )
+interp (Callcc x v) e = callccK (\k -> interp v ((x, Fun k) : e))
 
 lookup :: Name -> Environment -> K Value
 lookup x [] = unitK Wrong
@@ -76,3 +80,17 @@ term0 =
   App
     (Lam "x" (Add (Var "x") (Var "x")))
     (Add (Con 10) (Con 11))
+
+term1 =
+  Add
+    (Con 1)
+    ( Callcc
+        "k"
+        ( Add
+            (Con 2)
+            ( App
+                (Var "k")
+                (Add (Con 5) (Con 6))
+            )
+        )
+    )
