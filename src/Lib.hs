@@ -5,16 +5,19 @@ import Prelude hiding (lookup)
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
 
-newtype M a = M a
+type Answer = Value
 
-unitM :: a -> M a
-unitM = M
+type K a = (a -> Answer) -> Answer
 
-bindM :: M a -> (a -> M b) -> M b
-bindM (M a) f = f a
+unitK :: a -> K a
+unitK a c = c a
 
-showM :: M Value -> String
-showM (M a) = showval a
+bindK :: K a -> (a -> K b) -> K b
+bindK m f c = m (`f` c)
+
+
+showK :: K Value -> String
+showK m = showval (m id)
 
 type Name = String
 
@@ -28,7 +31,7 @@ data Term
 data Value
   = Wrong
   | Num Int
-  | Fun (Value -> M Value)
+  | Fun (Value -> K Value)
 
 type Environment = [(Name, Value)]
 
@@ -37,37 +40,37 @@ showval Wrong = "<wrong>"
 showval (Num i) = show i
 showval (Fun f) = "<function>"
 
-interp :: Term -> Environment -> M Value
+interp :: Term -> Environment -> K Value
 interp (Var x) e = lookup x e
-interp (Con i) e = unitM (Num i)
+interp (Con i) e = unitK (Num i)
 interp (Add u v) e =
   interp u e
-    `bindM` ( \a ->
+    `bindK` ( \a ->
                 interp v e
-                  `bindM` add a
+                  `bindK` add a
             )
-interp (Lam x v) e = unitM (Fun (\a -> interp v ((x, a) : e)))
+interp (Lam x v) e = unitK (Fun (\a -> interp v ((x, a) : e)))
 interp (App t u) e =
   interp t e
-    `bindM` ( \f ->
+    `bindK` ( \f ->
                 interp u e
-                  `bindM` apply f
+                  `bindK` apply f
             )
 
-lookup :: Name -> Environment -> M Value
-lookup x [] = unitM Wrong
-lookup x ((y, b) : e) = if x == y then unitM b else lookup x e
+lookup :: Name -> Environment -> K Value
+lookup x [] = unitK Wrong
+lookup x ((y, b) : e) = if x == y then unitK b else lookup x e
 
-add :: Value -> Value -> M Value
-add (Num i) (Num j) = unitM $ Num $ i + j
-add _ _ = unitM Wrong
+add :: Value -> Value -> K Value
+add (Num i) (Num j) = unitK $ Num $ i + j
+add _ _ = unitK Wrong
 
-apply :: Value -> Value -> M Value
+apply :: Value -> Value -> K Value
 apply (Fun f) a = f a
-apply _ _ = unitM Wrong
+apply _ _ = unitK Wrong
 
 test :: Term -> String
-test t = showM (interp t [])
+test t = showK (interp t [])
 
 term0 =
   App
