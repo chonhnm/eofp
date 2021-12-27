@@ -33,6 +33,7 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , mtl
   default-language: Haskell2010
 
 executable eofp-exe
@@ -46,6 +47,7 @@ executable eofp-exe
       base >=4.7 && <5
     , containers
     , eofp
+    , mtl
   default-language: Haskell2010
 
 test-suite eofp-test
@@ -60,4 +62,5 @@ test-suite eofp-test
       base >=4.7 && <5
     , containers
     , eofp
+    , mtl
   default-language: Haskell2010
