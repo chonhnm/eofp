@@ -6,6 +6,7 @@ import Data.Functor.Identity (Identity (runIdentity))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromJust)
+import Control.Monad.Reader
 
 someFunc :: IO ()
 someFunc = print "hello"
@@ -100,3 +101,38 @@ eval2 env (App e1 e2) =
 
 t2 = runEval2 (eval2 Map.empty exampleExp)
 t2b = runEval2 (eval2 Map.empty exampleExpErr)
+
+type Eval3 a = ReaderT Env (ExceptT String Identity) a 
+
+runEval3 :: Env -> Eval3 a -> Either String a 
+runEval3 env ev = runIdentity $ runExceptT $ runReaderT ev env 
+
+eval3 :: Expr -> Eval3 Value 
+eval3 (Lit i) = return $ IntVal i 
+eval3 (Var n) = 
+  do 
+    env <- ask 
+    case Map.lookup n env of 
+      Nothing -> throwError $ "unbound variable: " ++ show n 
+      Just a -> return a 
+eval3 (Plus e1 e2) = 
+  do 
+    val1 <- eval3  e1
+    val2 <- eval3  e2
+    case (val1, val2) of 
+      (IntVal i1, IntVal i2) -> return $ IntVal (i1 + i2)
+      _ -> throwError "type error in addition"  
+eval3 (Abs n e) = 
+  do 
+    env <- ask 
+    return $ FunVal env n e 
+eval3 (App e1 e2) =
+  do  
+   val1 <- eval3 e1 
+   val2 <- eval3 e2 
+   case val1 of 
+     FunVal env' n e -> local (const (Map.insert n val2 env')) (eval3 e)
+     _ -> throwError "type error in application"
+
+t3 :: Either String Value
+t3 = runEval3 Map.empty (eval3 exampleExp)     
