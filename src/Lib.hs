@@ -84,7 +84,7 @@ eval2 :: Env -> Expr -> Eval2 Value
 eval2 env (Lit i) = return $ IntVal i
 eval2 env (Var n) =
   case Map.lookup n env of
-    Nothing -> throwError $ "unbound variable: " ++ show n
+    Nothing -> throwError $ "unbound variable: " ++ n
     Just a -> return a
 eval2 env (Plus e1 e2) =
   do
@@ -117,7 +117,7 @@ eval3 (Var n) =
   do
     env <- ask
     case Map.lookup n env of
-      Nothing -> throwError $ "unbound variable: " ++ show n
+      Nothing -> throwError $ "unbound variable: " ++ n
       Just a -> return a
 eval3 (Plus e1 e2) =
   do
@@ -161,7 +161,7 @@ eval4 (Var n) =
     tick
     env <- ask
     case Map.lookup n env of
-      Nothing -> throwError $ "unbound variable: " ++ show n
+      Nothing -> throwError $ "unbound variable: " ++ n
       Just a -> return a
 eval4 (Plus e1 e2) =
   do
@@ -206,7 +206,7 @@ eval4' (Var n) =
     tick
     env <- ask
     case Map.lookup n env of
-      Nothing -> throwError $ "variable not found " ++ show n
+      Nothing -> throwError $ "variable not found " ++ n
       Just a -> return a
 eval4' (Plus e1 e2) =
   do
@@ -275,7 +275,7 @@ eval5 (Var n) =
     tell [n]
     env <- ask
     case Map.lookup n env of
-      Nothing -> throwError $ "variable not found " ++ show n
+      Nothing -> throwError $ "variable not found " ++ n
       Just a -> return a
 eval5 (Plus e1 e2) =
   do
@@ -304,3 +304,54 @@ t5 = runEval5 Map.empty 0 (eval5 exampleExp)
 
 t5a :: ((Either String Value, [String]), Integer)
 t5a = runEval5 Map.empty 0 (eval5 exampleExpErr)
+
+type Eval6 a = ReaderT Env (ExceptT String (WriterT [String] (StateT Integer IO))) a
+
+runEval6 ::
+  r ->
+  s ->
+  ReaderT r (ExceptT e (WriterT w (StateT s m))) a ->
+  m ((Either e a, w), s)
+runEval6 env s m = runStateT (runWriterT (runExceptT (runReaderT m env))) s
+
+eval6 :: Expr -> Eval6 Value
+eval6 (Lit i) =
+  do
+    tick
+    liftIO $ print i 
+    return $ IntVal i
+eval6 (Var n) =
+  do
+    tick
+    tell [n]
+    env <- ask
+    case Map.lookup n env of
+      Nothing -> throwError $ "variable not found " ++ n
+      Just a -> return a
+eval6 (Plus e1 e2) =
+  do
+    tick
+    val1 <- eval6 e1
+    val2 <- eval6 e2
+    case (val1, val2) of
+      (IntVal i1, IntVal i2) -> return $ IntVal $ i1 + i2
+      _ -> throwError "type error in addition"
+eval6 (Abs n e) =
+  do
+    tick
+    env <- ask
+    return $ FunVal env n e
+eval6 (App e1 e2) =
+  do
+    tick
+    val1 <- eval6 e1
+    val2 <- eval6 e2
+    case val1 of
+      FunVal env' n e -> withReaderT (const (Map.insert n val2 env')) (eval6 e)
+      _ -> throwError "type error in application"
+
+t6 :: IO ((Either String Value, [String]), Integer)
+t6 = runEval6 Map.empty 0 (eval6 exampleExp)
+
+t6a :: IO ((Either String Value, [String]), Integer)
+t6a = runEval6 Map.empty 0 (eval6 exampleExpErr)
